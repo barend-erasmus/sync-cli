@@ -2,6 +2,7 @@ import * as recursive from 'recursive-readdir';
 import * as path from 'path';
 import * as fs from 'graceful-fs';
 import * as md5File from 'md5-file';
+import * as co from 'co';
 import { IGateway } from './gateway';
 
 export class FileSystemGateway implements IGateway {
@@ -10,7 +11,7 @@ export class FileSystemGateway implements IGateway {
 
     }
 
-    public createDirectory(dirPath): Promise<Boolean> {
+    public createDirectory(dirPath): Promise<boolean> {
         dirPath = this.formatAndBuildFullPath(dirPath);
 
         let parts = dirPath.split(path.sep);
@@ -21,55 +22,46 @@ export class FileSystemGateway implements IGateway {
         return Promise.resolve(true);
     }
 
-    public listFileObjects(): Promise<string[]> {
-        return null;
-    }
-
     public listFiles(): Promise<string[]> {
-        return new Promise((fulfill, reject) => {
+        return new Promise((resolve, reject) => {
             recursive(this.basePath, (err: Error, files: string[]) => {
                 if (err) {
                     reject(err);
                 } else {
-                    fulfill(files.map(x => path.relative(this.basePath, x).replace(new RegExp('\\' + path.sep, 'g'), '/')));
+                    resolve(files.map(x => path.relative(this.basePath, x).replace(new RegExp('\\' + path.sep, 'g'), '/')));
                 }
             });
         });
     }
 
-    public getFileReadStream(filePath: string) {
+    public getFileReadStream(filePath: string): Promise<any> {
         filePath = this.formatAndBuildFullPath(filePath);
         return Promise.resolve(fs.createReadStream(filePath));
-    }
-
-    public getFileWriteStream(filePath: string) {
-        filePath = this.formatAndBuildFullPath(filePath);
-        return Promise.resolve(fs.createWriteStream(filePath));
     }
 
     public getFileComparator(filePath: string): Promise<string> {
         filePath = this.formatAndBuildFullPath(filePath);
 
-        let result = (<any>md5File).sync(filePath);
+        const result = (<any>md5File).sync(filePath);
 
         return Promise.resolve(result);
     }
 
-    public deleteFile(filePath: string): Promise<Boolean> {
+    public deleteFile(filePath: string): Promise<boolean> {
         filePath = this.formatAndBuildFullPath(filePath);
         fs.unlinkSync(filePath);
 
         return Promise.resolve(true);
     }
 
-    public deleteDirectory(dirPath: string): Promise<Boolean> {
+    public deleteDirectory(dirPath: string): Promise<boolean> {
         dirPath = this.formatAndBuildFullPath(dirPath);
         fs.unlinkSync(dirPath);
 
         return Promise.resolve(true);
     }
 
-    public directoryExist(dirPath: string): Promise<Boolean> {
+    public directoryExist(dirPath: string): Promise<boolean> {
         dirPath = this.formatAndBuildFullPath(dirPath);
 
         try {
@@ -80,7 +72,7 @@ export class FileSystemGateway implements IGateway {
         }
     }
 
-    public fileExist(filePath: string): Promise<Boolean> {
+    public fileExist(filePath: string): Promise<boolean> {
         filePath = this.formatAndBuildFullPath(filePath);
 
         try {
@@ -91,32 +83,47 @@ export class FileSystemGateway implements IGateway {
         }
     }
 
-    public copy(streamSrc: fs.ReadStream, streamDest: fs.WriteStream) {
-        return new Promise((fulfill, reject) => {
+    public upload(stream: fs.ReadStream, destination: string): Promise<boolean> {
+        const self = this;
+        return co(function* () {
 
+            const streamDest = yield self.getFileWriteStream(destination);
 
-            streamSrc.on('error', (err: Error) => {
-                reject(err);
+            yield new Promise((resolve, reject) => {
+                stream.on('error', (err: Error) => {
+                    reject(err);
+                });
+
+                streamDest.on('error', (err: Error) => {
+                    reject(err);
+                });
+
+                stream.on('finish', function () {
+
+                });
+
+                streamDest.on('finish', function () {
+                    resolve(true);
+                });
+
+                stream.pipe(streamDest);
             });
 
-            streamDest.on('error', (err: Error) => {
-                reject(err);
-            });
-
-            streamSrc.on('finish', function () {
-                
-            });
-
-            streamDest.on('finish', function () {
-                fulfill(true);
-            });
-
-            streamSrc.pipe(streamDest);
+            return true;
         });
     }
 
-    private mkdirSync(dirPath): Boolean {
-        let result: Boolean;
+    public close(): Promise<boolean> {
+        return Promise.resolve(true);
+    }
+
+    private getFileWriteStream(filePath: string): Promise<any> {
+        filePath = this.formatAndBuildFullPath(filePath);
+        return Promise.resolve(fs.createWriteStream(filePath));
+    }
+
+    private mkdirSync(dirPath): boolean {
+        let result: boolean;
 
         try {
             fs.mkdirSync(dirPath);
@@ -128,7 +135,7 @@ export class FileSystemGateway implements IGateway {
         return result;
     }
 
-    private formatAndBuildFullPath(filePath: string) {
+    private formatAndBuildFullPath(filePath: string): string {
         filePath = path.join(this.basePath, filePath);
         filePath = filePath.replace(new RegExp('\\' + '/', 'g'), path.sep);
 

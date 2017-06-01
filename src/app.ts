@@ -1,12 +1,28 @@
 import * as co from 'co';
 import * as path from 'path';
+import * as yargs from 'yargs';
 import { IGateway } from './gateways/gateway';
 
 import { FileSystemGateway } from './gateways/file-system';
+import { SFTPGateway } from './gateways/sftp';
+
+const argv = (<any>yargs).argv;
 
 co(function* () {
-    const sourceGateway: IGateway = new FileSystemGateway('C:\\Temp\\a');
-    const destinationGateway: IGateway = new FileSystemGateway('C:\\Temp\\b');
+    let sourceGateway: IGateway = null;
+    let destinationGateway: IGateway = null;
+
+    switch (argv.sourceType) {
+        case 'filesystem':
+            sourceGateway = new FileSystemGateway(argv.sourceBasePath);
+            break;
+    }
+
+    switch (argv.destinationType) {
+        case 'filesystem':
+            destinationGateway = new FileSystemGateway(argv.destinationBasePath);
+            break;
+    }
 
     const sourceFiles: string[] = yield sourceGateway.listFiles();
 
@@ -31,6 +47,7 @@ co(function* () {
             const destinationFileComparator: string = yield destinationGateway.getFileComparator(sourceFile);
 
             if (sourceFileComparator === destinationFileComparator) {
+                log(`No changes found '${sourceFile}'`);
                 shouldCopyToDestination = false;
             }
         }
@@ -38,13 +55,15 @@ co(function* () {
         if (shouldCopyToDestination) {
             log(`Queuing '${sourceFile}' for copying to destination`);
             const sourceFileStream = yield sourceGateway.getFileReadStream(sourceFile);
-            const destinationFileStream = yield destinationGateway.getFileWriteStream(sourceFile);
 
-            yield sourceGateway.copy(sourceFileStream, destinationFileStream);
+            yield destinationGateway.upload(sourceFileStream, sourceFile);
 
             log(`Successfully copied '${sourceFile}' to destination`);
         }
     }
+
+    sourceGateway.close();
+    destinationGateway.close();
 });
 
 

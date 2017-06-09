@@ -1,10 +1,10 @@
 {
   "name": "sync-cli",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "",
-  "main": "./dist/app.js",
+  "main": "./src/app.js",
   "scripts": {
-    "start": "gulp build:dev & node ./dist/app.js --sourceType filesystem --sourceBasePath \"C:\\Temp\\a\" --destinationType filesystem --destinationBasePath \"C:\\Temp\\a\""
+    "start": "tsc & node ./src/app.js --sourceType filesystem --sourceBasePath \"C:\\Temp\\a\" --destinationType filesystem --destinationBasePath \"C:\\Temp\\a\""
   },
   "repository": {
     "type": "git",
@@ -28,10 +28,6 @@
     "yargs": "^8.0.1"
   },
   "devDependencies": {
-    "gulp": "^3.9.1",
-    "gulp-clean": "^0.3.2",
-    "gulp-typescript": "^3.1.7",
-    "run-sequence": "^1.2.2",
     "typescript": "^2.3.4"
   },
   "bin": {

@@ -1,8 +1,10 @@
+// Imports
 import * as co from 'co';
 import * as path from 'path';
 import * as yargs from 'yargs';
 import { IGateway } from './gateways/gateway';
 
+// Imports gateways
 import { FileSystemGateway } from './gateways/file-system';
 import { SFTPGateway } from './gateways/sftp';
 import { RackspaceGateway } from './gateways/rackspace';

@@ -2,12 +2,15 @@
 import * as co from 'co';
 import * as path from 'path';
 import * as yargs from 'yargs';
+import * as winston from 'winston';
 import { IGateway } from './gateways/gateway';
 
 // Imports gateways
 import { FileSystemGateway } from './gateways/file-system';
 import { SFTPGateway } from './gateways/sftp';
 import { RackspaceGateway } from './gateways/rackspace';
+
+winston.add(winston.transports.File, { filename: 'sync-cli.log', level: 'debug' });
 
 const argv = (<any>yargs)
     .usage('Usage: $0 [options]')
@@ -34,6 +37,8 @@ const argv = (<any>yargs)
     .demandOption('sourceType')
     .demandOption('destinationType')
     .argv;
+
+winston.debug(`Start`, argv);
 
 co(function* () {
     let sourceGateway: IGateway = null;
@@ -65,7 +70,7 @@ co(function* () {
 
     const sourceFiles: string[] = yield sourceGateway.listFiles();
 
-    log(`Source contains '${sourceFiles.length}' files`);
+    winston.info(`Source contains '${sourceFiles.length}' files`);
 
     for (const sourceFile of sourceFiles) {
         const sourceDirectory: string = path.dirname(sourceFile);
@@ -74,7 +79,7 @@ co(function* () {
 
         if (!directoryExistOnDestination) {
             yield destinationGateway.createDirectory(sourceDirectory);
-            log(`Created directory '${sourceDirectory}' on destination`);
+            winston.info(`Created directory '${sourceDirectory}' on destination`);
         }
 
         let shouldCopyToDestination = true;
@@ -86,26 +91,21 @@ co(function* () {
             const destinationFileComparator: string = yield destinationGateway.getFileComparator(sourceFile);
 
             if (sourceFileComparator === destinationFileComparator) {
-                log(`No changes found '${sourceFile}'`);
+                winston.info(`No changes found for '${sourceFile}'`);
                 shouldCopyToDestination = false;
             }
         }
 
         if (shouldCopyToDestination) {
-            log(`Queuing '${sourceFile}' for copying to destination`);
+            winston.info(`Queuing '${sourceFile}' for copying to destination`)
             const sourceFileStream = yield sourceGateway.getFileReadStream(sourceFile);
 
             yield destinationGateway.upload(sourceFileStream, sourceFile);
 
-            log(`Successfully copied '${sourceFile}' to destination`);
+            winston.info(`Sucessfully copied '${sourceFile}' to destination`);
         }
     }
 
     sourceGateway.close();
     destinationGateway.close();
 });
-
-
-function log(message: string) {
-    console.log(message);
-}
